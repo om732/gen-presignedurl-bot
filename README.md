@@ -1,6 +1,8 @@
 Generate PresignedURL Bot for Slack
 ===
 
+Upload file from slack to S3 and generate Pre Signed-URL.
+
 ## Configure
 
 1. create S3 bucket
@@ -29,7 +31,7 @@ Get `OAuth Access Token` & `Bot User OAuth Access Token`
 
 ```
 {
-  "channel_id": "slack channel id",
+  "channels": ["slack channel name", "slack channel name"],
   "bucket_name": "s3 bucket name",
   "expires_day": "url expiration date (max 7)"
 }

@@ -38,7 +38,6 @@ const downloadSlackPrivateFile = async (url, token) => {
 
 const uploadFileToS3 = async (options) => {
   try {
-    console.log(options);
     return await s3.upload(options).promise();
   } catch(e) {
     throw e;
@@ -53,33 +52,53 @@ const getPresignedUrl = async (options) => {
   }
 }
 
+const getChannelName = async (bot, message) => {
+  return new Promise((resolve, reject) => {
+    const channelID = message.channel;
+    if (channelID.charAt(0) === 'C') {
+      bot.api.channels.info({channel: channelID}, (err, result) => {
+        err ? reject(err) : resolve(result.channel.name);
+      });
+    } else if (channelID.charAt(0) === 'G') {
+      bot.api.groups.info({channel: channelID}, (err, result) => {
+        err ? reject(err) : resolve(result.group.name);
+      });
+    } else {
+      reject('undefined channel id');
+    }
+  });
+}
+
 controller.on('file_share', (bot, message) => {
-  const slackFileUrl = message.file.url_private_download;
-  const channelID = message.channel;
+  (async () => {
+    try {
+      const channelName = await getChannelName(bot, message);
+      // check channel
+      if (config.channels.includes(channelName)) {
+        // download uploadfile
+        const slackFileUrl = message.file.url_private_download;
+        const content = await downloadSlackPrivateFile(slackFileUrl, userToken);
 
-  // check channel
-  if (channelID == config.channel_id) {
-    (async () => {
-      // download uploadfile
-      const content = await downloadSlackPrivateFile(slackFileUrl, userToken);
+        // upload s3
+        const s3Options = {
+          Bucket: config.bucket_name,
+          Key: `${message.user}/${message.file.name}`,
+          Body: content,
+          ContentType: message.file.mimetype
+        }
+        await uploadFileToS3(s3Options);
 
-      // upload s3
-      const s3Options = {
-        Bucket: config.bucket_name,
-        Key: `${message.user}/${message.file.name}`,
-        Body: content,
-        ContentType: message.file.mimetype
+        // get pre-signed url
+        delete s3Options['Body'];
+        delete s3Options['ContentType'];
+        s3Options['Expires'] = config.expires_day * 86400;
+        const preSignedUrl = await getPresignedUrl(s3Options);
+
+        // response
+        bot.reply(message, `Generate Presigned URL\n\`\`\`filename: ${message.file.name}\nexpires: ${moment().add(config.expires_day, 'days').format('YYYY/MM/DD HH:mm:ss')}\`\`\` ${preSignedUrl}`);
       }
-      await uploadFileToS3(s3Options);
-
-      // get pre-signed url
-      delete s3Options['Body'];
-      delete s3Options['ContentType'];
-      s3Options['Expires'] = config.expires_day * 86400;
-      const preSignedUrl = await getPresignedUrl(s3Options);
-
-      // response
-      bot.reply(message, `Generate Presigned URL\n\`\`\`filename: ${message.file.name}\nexpires: ${moment().add(config.expires_day, 'days').format('YYYY/MM/DD HH:mm:ss')}\`\`\` ${preSignedUrl}`);
-    })();
-  }
+    } catch(e) {
+      console.log(e)
+    }
+  })();
 })

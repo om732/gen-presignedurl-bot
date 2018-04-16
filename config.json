@@ -1,5 +1,5 @@
 {
-  "channel_id": "slack channel id",
+  "channels": ["slack channel name", "slack channel name"],
   "bucket_name": "s3 bucket name",
   "expires_day": "url expiration date (max 7)"
 }
