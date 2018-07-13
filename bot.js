@@ -16,6 +16,7 @@ const controller = Botkit.slackbot({
   debug: process.env.DEBUG || false,
 });
 const bot = controller.spawn({
+  retry: 3,
   token: process.env.botToken
 }).startRTM();
 const userToken = process.env.userToken
