@@ -4,10 +4,10 @@
   "description": "",
   "main": "bot.js",
   "dependencies": {
-    "aws-sdk": "^2.224.1",
-    "botkit": "^0.6.13",
-    "moment": "^2.22.0",
-    "request": "^2.85.0",
+    "aws-sdk": "^2.274.1",
+    "botkit": "^0.6.15",
+    "moment": "^2.22.2",
+    "request": "^2.87.0",
     "request-promise": "^4.2.2"
   },
   "devDependencies": {},
