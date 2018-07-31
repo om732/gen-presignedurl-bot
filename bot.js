@@ -53,9 +53,8 @@ const getPresignedUrl = async (options) => {
   }
 }
 
-const getChannelName = async (bot, message) => {
+const getChannelName = async (bot, channelID) => {
   return new Promise((resolve, reject) => {
-    const channelID = message.channel;
     if (channelID.charAt(0) === 'C') {
       bot.api.channels.info({channel: channelID}, (err, result) => {
         err ? reject(err) : resolve(result.channel.name);
@@ -70,22 +69,53 @@ const getChannelName = async (bot, message) => {
   });
 }
 
-controller.on('file_share', (bot, message) => {
+const getFileInfo = async (bot, fileID) => {
+  return new Promise((resolve, reject) => {
+    bot.api.files.info({file:fileID}, (err, result) => {
+      err ? reject(err) : resolve(result);
+    });
+  });
+}
+
+const postMessage = async (bot, channelID, text) => {
+  return new Promise((resolve, reject) => {
+    bot.api.chat.postMessage({channel:channelID, text:text}, (err, result) => {
+      err ? reject(err) : resolve(result);
+    });
+  });
+
+}
+
+controller.hears(['hello', 'hi'], 'direct_mention,mention', (bot, message) => {
+  bot.reply(message, 'hi');
+});
+
+controller.on('file_shared', (bot, message) => {
   (async () => {
     try {
-      const channelName = await getChannelName(bot, message);
+      console.log(message)
+      const fileInfo = await getFileInfo(bot, message.file_id)
+
+      let channelID;
+      if (fileInfo.file.channels.length !== 0) {
+        channelID = fileInfo.file.channels[0];
+      } else if (fileInfo.file.groups.length !== 0) {
+        channelID = fileInfo.file.groups[0];
+      }
+
+      const channelName = await getChannelName(bot, channelID);
       // check channel
       if (config.channels.includes(channelName)) {
         // download uploadfile
-        const slackFileUrl = message.file.url_private_download;
+        const slackFileUrl = fileInfo.file.url_private_download;
         const content = await downloadSlackPrivateFile(slackFileUrl, userToken);
 
         // upload s3
         const s3Options = {
           Bucket: config.bucket_name,
-          Key: `${message.user}/${message.file.name}`,
+          Key: `${fileInfo.file.user}/${fileInfo.file.name}`,
           Body: content,
-          ContentType: message.file.mimetype
+          ContentType: fileInfo.file.mimetype
         }
         await uploadFileToS3(s3Options);
 
@@ -96,7 +126,7 @@ controller.on('file_share', (bot, message) => {
         const preSignedUrl = await getPresignedUrl(s3Options);
 
         // response
-        bot.reply(message, `Generate Presigned URL\n\`\`\`filename: ${message.file.name}\nexpires: ${moment().add(config.expires_day, 'days').format('YYYY/MM/DD HH:mm:ss')}\`\`\` ${preSignedUrl}`);
+        postMessage(bot, channelID, `Generate Presigned URL\n\`\`\`filename: ${fileInfo.file.name}\nexpires: ${moment().add(config.expires_day, 'days').format('YYYY/MM/DD HH:mm:ss')}\`\`\` ${preSignedUrl}`)
       }
     } catch(e) {
       console.log(e)
